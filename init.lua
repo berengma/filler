@@ -1,15 +1,18 @@
 filler = {}
 filler.blacklist = {}
+filler.rollbackdata = {}
+filler.rollbackmanip = {}
 filler.endless_placeable = {}
 filler.placing_from_top_to_bottom = {}
 filler.blacklist["protector:protect"] = true
 filler.blacklist["protector:protect2"] = true
 --filler.endless_placeable["air"] = true
 --filler.endless_placeable["default:water_source"] = true
+filler.rollback_counter = {}
 
 filler.placing_from_top_to_bottom["air"] = true
 
-local max_volume = 32^3
+local max_volume = 512
 local color_pos1 = "#ffbb00"
 local color_pos2 = "#00bbff"
 local speed = 0.1
@@ -19,6 +22,9 @@ local sound_scan_node = "default_dig_metal"
 local marker_time = 4
 local ownercheck = false  -- set to true makes the device belonging to one user only (anti_griefing)
 local recipe_on = true   -- tool can be crafted
+local max_player_distance = 16   -- player must be near marker one or two, to be able to use the tool
+local jungleserver = true        -- things that will not work on other servers
+
 
 local mod_storage = minetest.get_mod_storage()
 
@@ -26,6 +32,109 @@ local function add_rollback_storage(player, pos, node)
 	local t = minetest.deserialize(mod_storage:get_string(player.."_rollback_storage")) or {}
 	table.insert(t, 1, {pos = pos, node = node})
 	mod_storage:set_string(player.."_rollback_storage", minetest.serialize(t))
+end
+
+
+
+----------------------------
+---- test area voxel.manip
+---- thanks to world edit :D
+----------------------------
+
+
+
+
+local function filler_init(pos1, pos2)
+	local manip = minetest.get_voxel_manip()
+	local emerged_pos1, emerged_pos2 = manip:read_from_map(pos1, pos2)
+	local area = VoxelArea:new({MinEdge=emerged_pos1, MaxEdge=emerged_pos2})
+	return manip, area
+end
+
+
+local function filler_finish(manip, data)
+	-- Update map
+	manip:set_data(data)
+	manip:write_to_map()
+	manip:update_map()
+end
+
+local function filler_sort_pos(pos1, pos2)
+	pos1 = {x=pos1.x, y=pos1.y, z=pos1.z}
+	pos2 = {x=pos2.x, y=pos2.y, z=pos2.z}
+	if pos1.x > pos2.x then
+		pos2.x, pos1.x = pos1.x, pos2.x
+	end
+	if pos1.y > pos2.y then
+		pos2.y, pos1.y = pos1.y, pos2.y
+	end
+	if pos1.z > pos2.z then
+		pos2.z, pos1.z = pos1.z, pos2.z
+	end
+	return pos1, pos2
+end
+
+--- Replaces all instances of `search_node` with `replace_node` in a region.
+-- When `inverse` is `true`, replaces all instances that are NOT `search_node`.
+-- @return The number of nodes replaced.
+local function filler_replace(pos1, pos2, search_node, replace_node, inverse, user)
+	local player_name = user:get_player_name()
+	local pos1, pos2 = filler_sort_pos(pos1, pos2)
+
+	local manip, area = filler_init(pos1, pos2)
+	local data = manip:get_data()
+	
+	filler.rollbackdata[player_name] = data
+	filler.rollbackmanip[player_name] = manip
+
+	local search_id = minetest.get_content_id(search_node)
+	local replace_id = minetest.get_content_id(replace_node)
+
+	local count = 0
+
+	if not inverse then
+		for i in area:iterp(pos1, pos2) do
+			if data[i] == search_id then
+				data[i] = replace_id
+				count = count + 1
+			end
+		end
+	else
+		for i in area:iterp(pos1, pos2) do
+			if data[i] ~= search_id then
+				data[i] = replace_id
+				count = count + 1
+			end
+		end
+	end
+
+	filler_finish(manip, data)
+
+	return count
+end
+
+
+local function filler_rollbackvoxel(player_name)
+    if filler.rollbackdata[player_name] then	
+	filler_finish(filler.rollbackmanip[player_name], filler.rollbackdata[player_name])
+    else
+      minetest.chat_send_player(player_name,"Nothing to rollback")
+    end
+end
+
+------------------------
+--- end voxel.manip area
+------------------------
+
+
+
+local function get_valid_distance(pos1,pos2,player)
+	--minetest.chat_send_all(">>>  "..vector.distance(pos1, player).."  -  "..vector.distance(pos2, player).."  <<<")
+	if vector.distance(pos1, player) < max_player_distance or vector.distance(pos2, player) < max_player_distance then
+	    return true
+	else
+	  return false
+	end
 end
 
 local function get_rollback_storage(player)
@@ -181,6 +290,7 @@ local function rollback_filling(player)
 		end
 	end
 	minetest.set_node(rollback_storage.pos, {name="air"})                  -- this more save in case of clay and other things which change shape if dug
+	
 	if inv:room_for_item("main", node.name) then
 		inv:add_item("main", node.name)                                        -- in case of rollback, dug items should be returned
 	else
@@ -313,7 +423,10 @@ minetest.register_tool("filler:filler", {
 		local volume = get_volume(pos1, pos2)
 		if not user then return end
 		local inv = user:get_inventory()
-		
+		if not get_valid_distance(pos1,pos2,user:getpos()) then
+		  minetest.chat_send_player(player_name, "Filling Tool: You are too far away from your markers")
+		  return
+		end
 		-- Ownercheck added here.
 		if ownercheck and not check_owner(itemstack,player_name) then
 		    return itemstack
@@ -360,6 +473,11 @@ minetest.register_tool("filler:filler", {
 		refresh_rollback_storage(player_name)
 		user:set_attribute("filler_activated", "true")
 		fill_area(cpos, bpos, epos, node, user, dpos, inv)
+		if jungleserver then
+		      filler.rollback_counter[player_name] = get_volume(pos1,pos2)
+		end
+		--filler_replace(pos1, pos2, "air", node.name, false, user)
+		--user:set_attribute("filler_activated", "false")
 	end,
 })
 
@@ -373,7 +491,13 @@ minetest.register_chatcommand("rsq", {
 			return
 		end
 		player:set_attribute("filler_activated", "true")
+		
+		
 		rollback_filling(player)
+		if jungleserver then
+		      players_income[name] = players_income[name] - (filler.rollback_counter[name] * 10)
+		end
+		--filler_rollbackvoxel(name)
 	end
 })
 
