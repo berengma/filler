@@ -494,7 +494,7 @@ minetest.register_chatcommand("rsq", {
 		
 		
 		rollback_filling(player)
-		if jungleserver then
+		if jungleserver and players_income[name] and filler.rollback_counter[name] then  -- avoid server crashes
 		      players_income[name] = players_income[name] - (filler.rollback_counter[name] * 10)
 		end
 		--filler_rollbackvoxel(name)
