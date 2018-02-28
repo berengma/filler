@@ -12,7 +12,7 @@ filler.rollback_counter = {}
 
 filler.placing_from_top_to_bottom["air"] = true
 
-local max_volume = 512
+local max_volume = 1024
 local color_pos1 = "#ffbb00"
 local color_pos2 = "#00bbff"
 local speed = 0.1
@@ -23,7 +23,7 @@ local marker_time = 4
 local ownercheck = false  -- set to true makes the device belonging to one user only (anti_griefing)
 local recipe_on = true   -- tool can be crafted
 local max_player_distance = 16   -- player must be near marker one or two, to be able to use the tool
-local jungleserver = true        -- things that will not work on other servers
+local jungleserver = false        -- things that will not work on other servers
 
 
 local mod_storage = minetest.get_mod_storage()
@@ -291,11 +291,14 @@ local function rollback_filling(player)
 	end
 	minetest.set_node(rollback_storage.pos, {name="air"})                  -- this more save in case of clay and other things which change shape if dug
 	
-	if inv:room_for_item("main", node.name) then
-		inv:add_item("main", node.name)                                        -- in case of rollback, dug items should be returned
-	else
-		minetest.item_drop(ItemStack(node.name), player, rollback_storage.pos)
+	if node.name ~= "air" and node.name ~= "ignore" then	  
+		  if inv:room_for_item("main", node.name) then
+			  inv:add_item("main", node.name)                                        -- in case of rollback, dug items should be returned
+		  else
+			  minetest.item_drop(ItemStack(node.name), player, rollback_storage.pos)
+		  end
 	end
+	
 	local node_sounds = minetest.registered_nodes[node.name].sounds
 	if node_sounds and node_sounds.dug then
 		minetest.sound_play(minetest.registered_nodes[node.name].sounds.dug, {pos = rollback_storage.pos})
@@ -346,7 +349,11 @@ local function fill_area(cpos, bpos, epos, node, player, dpos, inv) --cpos, dpos
 
 	-- works perfect but bad performance
 	minetest.item_place_node(ItemStack(node.name), player, {type="node", under=cpos, above=cpos}, node.param2)
-	
+	--
+	  
+	 if players_income[player_name] then players_income[player_name] = players_income[player_name] -10 end  -- no earning money with filler tool in jungleserver
+	 
+	 
 	-- alternatives
 	--minetest.add_node(cpos, node)
 	--minetest.place_node(cpos, node)
