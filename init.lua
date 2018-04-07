@@ -12,7 +12,7 @@ filler.rollback_counter = {}
 
 filler.placing_from_top_to_bottom["air"] = true
 
-local max_volume = 1024
+local max_volume = 512
 local color_pos1 = "#ffbb00"
 local color_pos2 = "#00bbff"
 local speed = 0.1
@@ -20,8 +20,8 @@ local sound_placing_failed = "default_item_smoke" --"default_cool_lava" --"defau
 local sound_set_pos = "default_place_node_hard"
 local sound_scan_node = "default_dig_metal"
 local marker_time = 4
-local ownercheck = false  -- set to true makes the device belonging to one user only (anti_griefing)
-local recipe_on = true   -- tool can be crafted
+local ownercheck = true  -- set to true makes the device belonging to one user only (anti_griefing)
+local recipe_on = false   -- tool can be crafted
 local max_player_distance = 16   -- player must be near marker one or two, to be able to use the tool
 local jungleserver = false        -- things that will not work on other servers
 
@@ -129,6 +129,9 @@ end
 
 
 local function get_valid_distance(pos1,pos2,player)
+	if pos1 == nil or pos2 == nil or player == nil then
+	    return false
+	end
 	--minetest.chat_send_all(">>>  "..vector.distance(pos1, player).."  -  "..vector.distance(pos2, player).."  <<<")
 	if vector.distance(pos1, player) < max_player_distance or vector.distance(pos2, player) < max_player_distance then
 	    return true
@@ -430,15 +433,18 @@ minetest.register_tool("filler:filler", {
 		local volume = get_volume(pos1, pos2)
 		if not user then return end
 		local inv = user:get_inventory()
-		if not get_valid_distance(pos1,pos2,user:getpos()) then
-		  minetest.chat_send_player(player_name, "Filling Tool: You are too far away from your markers")
-		  return
-		end
+		
 		-- Ownercheck added here.
 		if ownercheck and not check_owner(itemstack,player_name) then
 		    return itemstack
 		end
 		-- End Ownercheck
+		
+		if not get_valid_distance(pos1,pos2,user:getpos()) then
+		  minetest.chat_send_player(player_name, "Filling Tool: You are too far away from your markers")
+		  return
+		end
+		
 		
 		if not node then
 			minetest.chat_send_player(player_name, "Filling Tool: Hold sneak and right click to select a node.")
