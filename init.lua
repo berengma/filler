@@ -12,14 +12,15 @@ filler.rollback_counter = {}
 
 filler.placing_from_top_to_bottom["air"] = true
 
-local max_volume = 512
+
+local max_volume = 1024
 local color_pos1 = "#ffbb00"
 local color_pos2 = "#00bbff"
 local speed = 0.1
 local sound_placing_failed = "default_item_smoke" --"default_cool_lava" --"default_tool_breaks"
 local sound_set_pos = "default_place_node_hard"
 local sound_scan_node = "default_dig_metal"
-local marker_time = 4
+local marker_time = 10
 local ownercheck = true  -- set to true makes the device belonging to one user only (anti_griefing)
 local recipe_on = false   -- tool can be crafted
 local max_player_distance = 16   -- player must be near marker one or two, to be able to use the tool
@@ -354,8 +355,9 @@ local function fill_area(cpos, bpos, epos, node, player, dpos, inv) --cpos, dpos
 	minetest.item_place_node(ItemStack(node.name), player, {type="node", under=cpos, above=cpos}, node.param2)
 	--
 	  
-	 if players_income[player_name] then players_income[player_name] = players_income[player_name] -10 end  -- no earning money with filler tool in jungleserver
-	 
+	if jungleserver then
+	    if players_income[player_name] then players_income[player_name] = players_income[player_name] -10 end  -- no earning money with filler tool in jungleserver
+	end
 	 
 	-- alternatives
 	--minetest.add_node(cpos, node)
@@ -507,8 +509,10 @@ minetest.register_chatcommand("rsq", {
 		
 		
 		rollback_filling(player)
-		if jungleserver and players_income[name] and filler.rollback_counter[name] then  -- avoid server crashes
+		if jungleserver then
+		  if players_income[name] and filler.rollback_counter[name] then  -- avoid server crashes
 		      players_income[name] = players_income[name] - (filler.rollback_counter[name] * 10)
+		  end
 		end
 		--filler_rollbackvoxel(name)
 	end
