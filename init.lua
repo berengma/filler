@@ -13,7 +13,7 @@ filler.rollback_counter = {}
 filler.placing_from_top_to_bottom["air"] = true
 
 
-local max_volume = 1024
+local max_volume = 512
 local color_pos1 = "#ffbb00"
 local color_pos2 = "#00bbff"
 local speed = 0.1
@@ -24,7 +24,7 @@ local marker_time = 10
 local ownercheck = true  -- set to true makes the device belonging to one user only (anti_griefing)
 local recipe_on = false   -- tool can be crafted
 local max_player_distance = 16   -- player must be near marker one or two, to be able to use the tool
-local jungleserver = false        -- things that will not work on other servers
+local jungleserver = true        -- things that will not work on other servers
 
 
 local mod_storage = minetest.get_mod_storage()
@@ -356,7 +356,9 @@ local function fill_area(cpos, bpos, epos, node, player, dpos, inv) --cpos, dpos
 	--
 	  
 	if jungleserver then
-	    if players_income[player_name] then players_income[player_name] = players_income[player_name] -10 end  -- no earning money with filler tool in jungleserver
+	    if players_income[player_name] then 
+		  players_income[player_name] = players_income[player_name] -10 end  -- no earning money with filler tool in jungleserver
+		  if players_income[player_name] < 0 then players_income[player_name] = 1 end 
 	end
 	 
 	-- alternatives
